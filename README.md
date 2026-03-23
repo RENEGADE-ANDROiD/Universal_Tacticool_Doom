@@ -1,10 +1,4 @@
-# Universal Weapon Tilt
+# Universal Weapon Lowering, Wall Detection & Rotational Tilting
 
-Universal Weapon Tilt is an addon for GZDoom that tilts the weapon sprite when the player strafes.
-
-# To-Do
-
--Add offset option so sprite borders aren't visible when the image is rotated
-
--Implement Gearbox CVar system for better optimization 
-
+An experimental fork of https://github.com/generic-name-guy/universal-weapon-tilt-gz by Generic Name Guy.
+This branch adds code made by Dithered Output, maker of Siren, that adds Weapon Lowering when tilting and Wall Detection.
