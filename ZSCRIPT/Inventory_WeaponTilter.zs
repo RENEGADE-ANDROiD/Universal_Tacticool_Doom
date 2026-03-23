@@ -16,13 +16,67 @@ class WeaponTilterInventory : Inventory
 	float rResistance, rVelocity, rLimit, rWallLoweringAmount;
 	vector2 direction, velocityUnit;
 	int currentTickCount;
-	bool debug, limit, offset, lowering, wallDetection;
+	bool limit, offset, lowering, wallDetection;
 	double loweringAmount, loweringSmoothing;
 	double duckAmount; // For wall detection lowering
+	
+	// Weapon exclusion arrays
+	static const string NO_ROTATE[] =
+	{
+		"PB_Minigun",
+		"PB_CryoRifle"
+	};
+
+	static const string SCOPED[] =
+	{
+		"PB_Railgun"
+	};
 	
 	default
 	{
 		Inventory.MaxAmount 1;
+	}
+	
+	// Helper function to check if weapon should skip rotation
+	private bool SkipRotation()
+	{
+		let weap = owner.player.readyWeapon;
+		if (!weap) return true;
+		Name cls = weap.GetClassName();
+		for (int i = 0; i < NO_ROTATE.Size(); i++)
+			if (cls == NO_ROTATE[i]) return true;
+		return false;
+	}
+	
+	// Helper function to check if weapon is scoped
+	private bool IsScoped()
+	{
+		let weap = owner.player.readyWeapon;
+		if (!weap) return false;
+
+		Name cls = weap.GetClassName();
+		bool found = false;
+		for (int i = 0; i < SCOPED.Size(); i++)
+		{
+			if (cls == SCOPED[i]) { found = true; break; }
+		}
+		if (!found) return false;
+
+		let psp = owner.player.FindPSprite(PSP_WEAPON);
+		if (!psp) return false;
+
+		State st;
+
+		st = weap.FindState("ZoomIn");
+		if (st && weap.InStateSequence(psp.curState, st)) return true;
+
+		st = weap.FindState("ZoomOut");
+		if (st && weap.InStateSequence(psp.curState, st)) return true;
+
+		st = weap.FindState("AltFire");
+		if (st && weap.InStateSequence(psp.curState, st)) return true;
+
+		return false;
 	}
 	
 	// Wall detection function
@@ -41,9 +95,9 @@ class WeaponTilterInventory : Inventory
 	
 	override void DoEffect()
 	{
-		super.DoEffect(); //not sure what this does
+		super.DoEffect();
 		
-		currentTickCount++; //count tick
+		currentTickCount++;
 		
 		// do nothing if the owner is null or not a player:
 		if(!owner || !owner.player)
@@ -56,7 +110,30 @@ class WeaponTilterInventory : Inventory
 
 		if(weaponsprite)
 		{
-			//to do: optimize further with the gearbox cvar system
+			// Check if we should skip rotation entirely (like for minigun/cryorifle)
+			if (SkipRotation())
+			{
+				// Reset any applied effects and return
+				weaponsprite.rotation = 0;
+				if(offset)
+				{
+					// Reset any offset modifications
+					weaponsprite.y = weaponsprite.y - loweringAmount;
+				}
+				return;
+			}
+			
+			// Check if scoped (railgun specific handling)
+			if (IsScoped())
+			{
+				// No tilt or offset when scoped
+				weaponsprite.rotation = 0;
+				if(offset)
+				{
+					weaponsprite.y = weaponsprite.y - loweringAmount;
+				}
+				return;
+			}
 			
 			//get cvars, optimized with tick count
 			if (currentTickCount % 35 == 0)
@@ -66,14 +143,13 @@ class WeaponTilterInventory : Inventory
 				rLimit = cvar.getcvar("wt_rollcap", owner.player).getfloat();
 				rWallLoweringAmount = cvar.getcvar("wt_walllowering", owner.player).getfloat();
 				
-				debug = cvar.getcvar("wt_debug", owner.player).getbool();
 				limit = cvar.getcvar("wt_cap", owner.player).getbool();
 				offset = cvar.getcvar("wt_offset", owner.player).getbool();
 				lowering = cvar.getcvar("wt_lowering", owner.player).getbool();
 				wallDetection = cvar.getcvar("wt_walldetection", owner.player).getbool();
 			}
 			
-			//calculate tilt and shit idk
+			//calculate tilt
 			aVelocity = atan2(owner.vel.y, owner.vel.x);
 			direction = (sin(-owner.angle), cos(-owner.angle));
 			velocityUnit = owner.vel.xy;
@@ -102,8 +178,8 @@ class WeaponTilterInventory : Inventory
 					targetLowering = min(30.0, targetLowering + rWallLoweringAmount);
 					
 					// Alternative: Use a duck-like system that builds up over time
-					// duckAmount = clamp(duckAmount + 6, 0, 30);
-					// targetLowering = max(targetLowering, duckAmount);
+					duckAmount = clamp(duckAmount + 6, 0, 30);
+					targetLowering = max(targetLowering, duckAmount);
 				}
 				else
 				{
@@ -112,7 +188,7 @@ class WeaponTilterInventory : Inventory
 				}
 				
 				// Smooth the lowering effect (recenter speed)
-				loweringSmoothing = 0.2; // Adjust this value for different smoothing speeds
+				loweringSmoothing = 0.2;
 				loweringAmount += (targetLowering - loweringAmount) * loweringSmoothing;
 				
 				// Apply the lowering offset
@@ -144,13 +220,6 @@ class WeaponTilterInventory : Inventory
 			
 			//apply tilt
 			weaponsprite.rotation = currentRoll;
-			
-			//debug
-			if(debug)
-			{
-				console.printf("roll: %f, lowering: %f, facing wall: %s", 
-					currentRoll, loweringAmount, bFacingWall() ? "true" : "false");
-			}
 		}
 	}
 }
