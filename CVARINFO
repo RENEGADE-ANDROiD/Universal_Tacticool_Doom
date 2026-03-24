@@ -1,5 +1,5 @@
-user float wt_rollresistance = 0.1;
-user float wt_rollvelocity = 1.4;
+user float wt_rollresistance = 0.25;
+user float wt_rollvelocity = 2.0;
 user float wt_rollcap = 2.5;
 user float wt_lowering = 1.0;
 user float wt_offset = 1.0;
