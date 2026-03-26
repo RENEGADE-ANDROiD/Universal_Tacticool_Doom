@@ -11,8 +11,7 @@ If your addon has a weapon that has too many overlays and doesn't play nice with
 	// Weapon exclusion arrays
 	static const string NO_ROTATE[] =
 	{
-		"PB_Minigun",
-		"PB_CryoRifle"
+		"PB_Minigun", "PB_CryoRifle", "PB_NukageBarrel"
 	};
 
 	static const string SCOPED[] =
