@@ -1,4 +1,4 @@
-# Universal Tacticool Doom
+# Universal Tacticool Doom (Doom II/Heretic/Hexen)
 <img width="1600" height="900" alt="tacticooldoommenu" src="https://github.com/user-attachments/assets/ffcbd851-82c0-4e55-bfb9-2594e47d2740" />
 
 
