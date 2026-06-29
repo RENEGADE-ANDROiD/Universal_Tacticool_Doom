@@ -1,7 +1,7 @@
 OptionMenu "WeaponTiltOptions" 
 {
 	Title "$UWT_TITL"
-    StaticText "Universal Lean, Weapon Lowering, Wall-Detection & Rotational-Tilting", gold
+    StaticText "Universal Lean, Weapon Lowering & Rotational Tilting", gold
    
     StaticText ""
 
@@ -14,10 +14,7 @@ OptionMenu "WeaponTiltOptions"
     Slider "$UWT_LOWERING_INTENSITY", "wt_lowering_intensity", 0.0, 2.0, 0.05, 2
     StaticText "0 = No lowering, 1 = Default, 2 = Double", "Teal"
     StaticText "Controls how much the weapon lowers when strafing.", "Teal"
-
-    Slider "$UWT_WALLLOWERING", "wt_walllowering", 0.0, 16.0, 0.5, 1
-    StaticText "Higher values make the weapon dip more.", "Teal"
-    StaticText "How much extra the weapon lowers when facing a wall.", "Teal"
+    Option "Enable Weapon Lowering", "wt_lowering", "OnOff"
     StaticText ""
 
     Option "$UWT_CAP", "wt_cap", "OnOff"
@@ -30,11 +27,12 @@ OptionMenu "WeaponTiltOptions"
     Option "$UWT_OFFSET", "wt_offset", "YesNo"
 
     StaticText ""
-    Option "$UWT_TILT_MOVING", "wt_tilt_moving", "OnOff"
-    Slider  "$UWT_TILT_MOVING_MIN", "wt_tilt_moving_min", 0.0, 8.0, 0.1, 1
-    Option "$UWT_TILT_READY", "wt_tilt_ready", "OnOff"
-    StaticText "$UWT_TILT_EXPLAIN", "Teal"
-    StaticText "$UWT_TILT_EXPLAIN2", "Teal"
+    StaticText "Stability Controls", "Gold"
+    Option "Only Tilt While Moving", "wt_tilt_moving", "OnOff"
+    Slider  "Minimum Movement Speed", "wt_tilt_moving_min", 0.0, 8.0, 0.1, 1
+    Option "Only Tilt in Ready/Hold States", "wt_tilt_ready", "OnOff"
+    StaticText "Helps reduce visual jitter during fire/reload animations.", "Teal"
+    StaticText "Turn these on if another weapon mod has heavy offsets.", "Teal"
 
 }
 

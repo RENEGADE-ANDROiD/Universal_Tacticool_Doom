@@ -1,23 +1,6 @@
 [enu default]
 UWT_TITL = "Universal Tacticool";
-UWT_TIT2 = "Universal Tacticool"
-
-UWT_TILT_MOVING = "Tilt Only While Moving"
-UWT_TILT_MOVING_MIN = "Minimum Move Speed (tilt when moving)"
-UWT_TILT_READY = "Tilt Only in Ready (not firing/reload)"
-UWT_TILT_EXPLAIN = "Moving / Ready: reduces jitter with weapon anims. Ready uses"
-UWT_TILT_EXPLAIN2 = "the Ready (or Hold) state tree; other mods may use other names."
-
-UWT_VELOCITY = "Velocity";
-UWT_RESISTANCE = "Resistance";
-
-UWT_DEBUG = "Debug (WARNING: Console Spam)";
-UWT_CAP = "Cap Roll";
-UWT_CAPAMOUNT = "Cap Amount";
-
-UWT_OFFSET = "Offset Sprite when Strafing";
-UWT_LOWERING_INTENSITY = "Strafe Lowering Intensity";
-UWT_WALLLOWERING = "Wall Lowering Amount";[enu default]
+UWT_TIT2 = "Universal Tacticool";
 
 UWT_VELOCITY = "Velocity";
 UWT_RESISTANCE = "Resistance";
@@ -28,4 +11,3 @@ UWT_CAPAMOUNT = "Cap Amount";
 
 UWT_OFFSET = "Offset Sprite when Strafing";
 UWT_LOWERING_INTENSITY = "Strafing Lowering Intensity";
-UWT_WALLLOWERING = "Wall Lowering Amount";

@@ -10,4 +10,27 @@ class WeaponTilterEventHandler : EventHandler
 	{
 		players[e.PlayerNumber].mo.A_GiveInventory("WeaponTilterInventory", 1);
 	}
+
+	override void WorldLoaded(WorldEvent e)
+	{
+		for (int i = 0; i < MAXPLAYERS; i++)
+		{
+			if (!playerInGame[i] || !players[i].mo)
+				continue;
+			players[i].mo.A_GiveInventory("WeaponTilterInventory", 1);
+		}
+	}
+
+	override void WorldTick()
+	{
+		for (int i = 0; i < MAXPLAYERS; i++)
+		{
+			if (!playerInGame[i] || !players[i].mo || !players[i].mo.player)
+				continue;
+
+			let inv = WeaponTilterInventory(players[i].mo.FindInventory("WeaponTilterInventory"));
+			if (inv)
+				inv.ApplyPose(players[i]);
+		}
+	}
 }

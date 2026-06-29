@@ -5,27 +5,48 @@ This is code licensed under Unlicense, so do whatever you want with it, i don't 
 */
 // PLUS //
 /////////////////////////////////////////////////////////
-///// Strafing Weapon Tilt - with Wall Detection 	/////
+/////    Strafing Weapon Tilt + Lowering        /////
 ///// 			For Project Brutaltiy				///// 
 /////        	 by Dithered OutPut					///// 
 /////////////////////////////////////////////////////////
 
 /* ============================================================================
-   Universal Weapon Tilter + Complete Leaning (Q/E + Strafe‑Lean Toggle)
+   Universal Weapon Tilter + Complete Leaning (Q/E + Strafe-Lean Toggle)
    Camera roll for leaning, weapon tilt only from movement
    ============================================================================ */
 
 class WeaponTilterInventory : Inventory
 {
     // ------------------------------------------------------------
-    // Weapon tilt variables
-    double currentRoll, crABS, aVelocity, adjustedCrABS;
-    float rResistance, rVelocity, rLimit, rWallLoweringAmount;
-    vector2 direction, velocityUnit;
+    // Tactical pose state (compute in DoEffect, apply in WorldTick)
+    double currentRoll;
+    double smoothedWeaponRoll;
+    double prevStrafeDot;
+    double loweringAmount;
+    double motionEnableBlend;
+    int strafeStableTicks;
+
+    double outputRoll;
+    double outputLowerY;
+    bool poseActive;
+    bool cvEnabled;
+
+    double lastAppliedRoll;
+    double lastAppliedY;
+
+    // Cached CVARs
+    float cvRollResistance;
+    float cvRollVelocity;
+    float cvRollCap;
+    float cvLoweringIntensity;
+    float cvTiltMovingMin;
+    bool cvCapRoll;
+    bool cvOffset;
+    bool cvLowering;
+    bool cvTiltMoving;
+    bool cvTiltReady;
+
     int currentTickCount;
-    bool limit, offset, lowering, wallDetection;
-    double loweringAmount, loweringSmoothing;
-    double duckAmount; // For wall detection lowering
 
     // ------------------------------------------------------------
     // Leaning variables
@@ -66,17 +87,45 @@ class WeaponTilterInventory : Inventory
     }
 
     // ------------------------------------------------------------
-    // Gating: is PSP_WEAPON's state in a typical idle/ready loop? (Fires, reload, respect, etc. are not in this tree.)
+    // Gating: is PSP_WEAPON in a typical ready loop?
     private bool IsWeaponReadyForTilt(Weapon weap, PSprite psp)
     {
-        if (!weap || !psp) return true;
+        if (!weap || !psp || !psp.CurState) return false;
 
         State st = weap.FindState("Ready");
-        if (!st) st = weap.FindState("Hold");
-        if (!st) return true; // do not break weapons that omit standard labels
+        if (st && weap.InStateSequence(psp.curState, st)) return true;
 
-        // first arg: state to test; second: first state of the sequence
-        return weap.InStateSequence(psp.curState, st);
+        st = weap.FindState("Hold");
+        if (st && weap.InStateSequence(psp.curState, st)) return true;
+
+        return false;
+    }
+
+    private bool IsSwitchState(Weapon weap, PSprite psp)
+    {
+        if (!weap || !psp || !psp.CurState)
+            return false;
+
+        static const statelabel switchLabels[] =
+        {
+            "Select", "Deselect"
+        };
+
+        for (int i = 0; i < switchLabels.Size(); ++i)
+        {
+            State st = weap.FindState(switchLabels[i]);
+            if (st && weap.InStateSequence(psp.CurState, st))
+                return true;
+        }
+
+        State upState = weap.GetUpState();
+        State downState = weap.GetDownState();
+        if (upState && weap.InStateSequence(psp.CurState, upState))
+            return true;
+        if (downState && weap.InStateSequence(psp.CurState, downState))
+            return true;
+
+        return false;
     }
 
     // Helper: check if weapon is scoped
@@ -111,21 +160,6 @@ class WeaponTilterInventory : Inventory
     }
 
     // ------------------------------------------------------------
-    // Wall detection
-    bool bFacingWall(double distance = 24, double offsetZ = -12)
-    {
-        FLineTraceData wallcheck;
-        owner.LineTrace(
-            owner.angle,
-            distance,
-            owner.pitch,
-            offsetz: owner.height + offsetZ,
-            data: wallcheck
-        );
-        return (wallcheck.HitType == TRACE_HitWall);
-    }
-
-    // ------------------------------------------------------------
     // Helper: player alive?
     bool bIsPlayerAlive()
     {
@@ -134,10 +168,12 @@ class WeaponTilterInventory : Inventory
     }
 
     // ------------------------------------------------------------
-    // Helper: on ground? (works with any ZScript version)
+    // Helper: on ground? (compat-safe across UZDoom builds)
     bool bIsOnFloor()
     {
         if (!owner) return false;
+        if (owner.bONMOBJ || owner.bMBFBOUNCER)
+            return true;
         return owner.Pos.Z == owner.FloorZ;
     }
 
@@ -150,84 +186,181 @@ class WeaponTilterInventory : Inventory
         return toLow + t * (toHigh - toLow);
     }
 
+    private bool HasStrafeActivity(PlayerInfo pi, double strafeDot)
+    {
+        if (!pi)
+            return false;
+        if (abs(pi.cmd.sidemove) > 0)
+            return true;
+        return abs(strafeDot) > 0.22;
+    }
+
+    private bool BlocksStrafeMotion(PlayerInfo pi, double forwardDot)
+    {
+        if (!pi)
+            return true;
+        if (abs(pi.cmd.forwardmove) > 0)
+            return true;
+        return abs(forwardDot) > 0.42;
+    }
+
+    private void UpdateMotionBlend(PlayerInfo pi, double strafeDot, double forwardDot)
+    {
+        if (BlocksStrafeMotion(pi, forwardDot) || !HasStrafeActivity(pi, strafeDot))
+        {
+            strafeStableTicks = 0;
+            motionEnableBlend *= 0.50;
+            if (motionEnableBlend < 0.02)
+                motionEnableBlend = 0;
+            return;
+        }
+
+        strafeStableTicks++;
+        if (strafeStableTicks < 3)
+            return;
+
+        motionEnableBlend += (1.0 - motionEnableBlend) * 0.12;
+    }
+
+    private void RefreshCvars(PlayerInfo pi)
+    {
+        cvRollResistance = cvar.getcvar("wt_rollresistance", pi).getfloat();
+        cvRollVelocity = cvar.getcvar("wt_rollvelocity", pi).getfloat();
+        cvRollCap = cvar.getcvar("wt_rollcap", pi).getfloat();
+        cvLoweringIntensity = cvar.getcvar("wt_lowering_intensity", pi).getfloat();
+        cvTiltMovingMin = cvar.getcvar("wt_tilt_moving_min", pi).getfloat();
+
+        cvEnabled = true; // global enable not present; keep addon active.
+        cvCapRoll = cvar.getcvar("wt_cap", pi).getbool();
+        cvOffset = cvar.getcvar("wt_offset", pi).getbool();
+        cvLowering = cvar.getcvar("wt_lowering", pi).getbool();
+        cvTiltMoving = cvar.getcvar("wt_tilt_moving", pi).getbool();
+        cvTiltReady = cvar.getcvar("wt_tilt_ready", pi).getbool();
+
+        cvLoweringIntensity = clamp(cvLoweringIntensity, 0.0, 2.0);
+    }
+
+    private bool ShouldBlockForSafety(Weapon weap, PSprite psp)
+    {
+        if (!owner || !owner.player || !weap || !psp)
+            return true;
+        if (SkipRotation())
+            return true;
+        if (IsScoped())
+            return true;
+        if (IsSwitchState(weap, psp))
+            return true;
+        return false;
+    }
+
+    private void ClearAppliedPose(PSprite psp)
+    {
+        if (!psp)
+            return;
+
+        if (lastAppliedY != 0)
+        {
+            psp.Y -= lastAppliedY;
+            lastAppliedY = 0;
+        }
+
+        if (lastAppliedRoll != 0)
+        {
+            psp.Rotation -= lastAppliedRoll;
+            lastAppliedRoll = 0;
+        }
+    }
+
+    void ApplyPose(PlayerInfo pi)
+    {
+        if (!pi)
+            return;
+
+        let psp = pi.FindPSprite(PSP_WEAPON);
+        if (!psp)
+            return;
+
+        ClearAppliedPose(psp);
+
+        if (!poseActive || !cvEnabled)
+            return;
+
+        psp.Rotation += outputRoll;
+        psp.Y += outputLowerY;
+        lastAppliedRoll = outputRoll;
+        lastAppliedY = outputLowerY;
+    }
+
     // ------------------------------------------------------------
     override void DoEffect()
     {
         super.DoEffect();
-
         currentTickCount++;
+        outputRoll = 0;
+        outputLowerY = 0;
+        poseActive = false;
 
         if (!owner || !owner.player)
             return;
 
         let weaponsprite = owner.player.FindPSprite(PSP_WEAPON);
-
-        if (!(owner.player.weaponstate & wf_weaponbobbing))
-            return;
-
-        if (!weaponsprite)
-            return;
-
-        // --- Skip for special weapons ---
-        if (SkipRotation())
-        {
-            weaponsprite.rotation = 0;
-            if (offset)
-                weaponsprite.y = weaponsprite.y - loweringAmount;
-            return;
-        }
-
-        // --- Scoped weapons: no tilt ---
-        if (IsScoped())
-        {
-            weaponsprite.rotation = 0;
-            if (offset)
-                weaponsprite.y = weaponsprite.y - loweringAmount;
-            return;
-        }
-
-        // --- Fetch CVARs (optimised: every 35 tics) ---
-        if (currentTickCount % 35 == 0)
-        {
-            rResistance = cvar.getcvar("wt_rollresistance", owner.player).getfloat();
-            rVelocity = cvar.getcvar("wt_rollvelocity", owner.player).getfloat();
-            rLimit = cvar.getcvar("wt_rollcap", owner.player).getfloat();
-            rWallLoweringAmount = cvar.getcvar("wt_walllowering", owner.player).getfloat();
-
-            limit = cvar.getcvar("wt_cap", owner.player).getbool();
-            offset = cvar.getcvar("wt_offset", owner.player).getbool();
-            lowering = cvar.getcvar("wt_lowering", owner.player).getbool();
-            wallDetection = cvar.getcvar("wt_walldetection", owner.player).getbool();
-        }
-
-        // --- Weapon tilt: optional gating (moving / idle "Ready" only) reduces fights with per-state offsets ---
         let wpn = owner.player.readyWeapon;
-        bool opt_tilt_moving = cvar.getcvar("wt_tilt_moving", owner.player).getbool();
-        double opt_tilt_moving_min = cvar.getcvar("wt_tilt_moving_min", owner.player).getfloat();
-        bool opt_tilt_ready = cvar.getcvar("wt_tilt_ready", owner.player).getbool();
+        if (!weaponsprite || !wpn)
+            return;
 
-        bool allowStrafeTilt = true;
-        if (opt_tilt_moving)
-        {
-            double horz = sqrt(owner.vel.x * owner.vel.x + owner.vel.y * owner.vel.y);
-            allowStrafeTilt = allowStrafeTilt && (horz > opt_tilt_moving_min);
-        }
-        if (opt_tilt_ready && wpn)
-            allowStrafeTilt = allowStrafeTilt && IsWeaponReadyForTilt(Weapon(wpn), weaponsprite);
+        if (currentTickCount == 1 || currentTickCount % 4 == 0)
+            RefreshCvars(owner.player);
 
-        // --- Weapon tilt calculation (original) ---
-        aVelocity = atan2(owner.vel.y, owner.vel.x);
-        direction = (sin(-owner.angle), cos(-owner.angle));
-        velocityUnit = owner.vel.xy;
-        if (allowStrafeTilt)
+        bool doStrafeMotion = (owner.player.weaponstate & wf_weaponbobbing) != 0;
+        bool blocked = ShouldBlockForSafety(Weapon(wpn), weaponsprite);
+        bool ready = IsWeaponReadyForTilt(Weapon(wpn), weaponsprite);
+
+        double speedXY = owner.Vel.XY.Length();
+        Vector2 strafeDir = (sin(-owner.angle), cos(-owner.angle));
+        Vector2 forwardDir = (cos(owner.angle), sin(owner.angle));
+        double strafeDot = owner.Vel.X * strafeDir.X + owner.Vel.Y * strafeDir.Y;
+        double forwardDot = owner.Vel.X * forwardDir.X + owner.Vel.Y * forwardDir.Y;
+
+        bool allowMotion = !blocked && doStrafeMotion;
+        if (cvTiltMoving)
+            allowMotion = allowMotion && (speedXY > cvTiltMovingMin);
+        if (cvTiltReady)
+            allowMotion = allowMotion && ready;
+
+        if (!allowMotion)
         {
-            currentRoll += (velocityUnit dot direction) * rVelocity;
-            currentRoll *= rResistance;
+            strafeStableTicks = 0;
+            motionEnableBlend *= 0.50;
+            if (motionEnableBlend < 0.02)
+                motionEnableBlend = 0;
         }
         else
-            currentRoll *= 0.75; // decay toward 0 when fire/reload/stand or not moving, avoids snapping
+        {
+            UpdateMotionBlend(owner.player, strafeDot, forwardDot);
+        }
 
-        crABS = abs(currentRoll);
+        bool allowRoll = allowMotion && motionEnableBlend > 0.08;
+        if (allowRoll)
+        {
+            if (prevStrafeDot * strafeDot < 0. && abs(strafeDot) > 0.02 && abs(prevStrafeDot) > 0.02)
+                currentRoll *= 0.55;
+
+            currentRoll += strafeDot * cvRollVelocity * motionEnableBlend;
+            currentRoll *= cvRollResistance;
+            if (cvCapRoll)
+                currentRoll = clamp(currentRoll, -cvRollCap, cvRollCap);
+        }
+        else
+        {
+            currentRoll *= 0.62;
+            if (motionEnableBlend < 0.02)
+                currentRoll = 0;
+        }
+
+        prevStrafeDot = strafeDot;
+        smoothedWeaponRoll = smoothedWeaponRoll * 0.65 + currentRoll * 0.35;
+        outputRoll = smoothedWeaponRoll * motionEnableBlend;
+        double crABS = abs(outputRoll);
 
         // ======================== LEANING SYSTEM ========================
         if (bIsPlayerAlive())
@@ -368,44 +501,34 @@ class WeaponTilterInventory : Inventory
         }
         // ======================== END LEANING ========================
 
-        // --- Weapon lowering (original) ---
-        if (lowering)
+        // --- Weapon lowering (strafe/movement only) ---
+        if (cvLowering)
         {
             double sidewaysMovement = abs(owner.player.cmd.sidemove);
             double targetLowering = 0;
 
             if (sidewaysMovement > 0)
-                targetLowering = min(22.0, (owner.vel.length() * 1.5) + sidewaysMovement * 0.05);
+                targetLowering = min(22.0, (speedXY * 1.5) + sidewaysMovement * 0.05);
 
-            if (wallDetection && bFacingWall())
-            {
-                targetLowering = min(30.0, targetLowering + rWallLoweringAmount);
-                duckAmount = clamp(duckAmount + 6, 0, 30);
-                targetLowering = max(targetLowering, duckAmount);
-            }
-            else
-            {
-                duckAmount *= 0.9;
-            }
+            targetLowering *= cvLoweringIntensity;
+            loweringAmount += (targetLowering - loweringAmount) * 0.2;
+            if (!allowMotion && motionEnableBlend < 0.08)
+                loweringAmount *= 0.75;
 
-            loweringSmoothing = 0.2;
-            loweringAmount += (targetLowering - loweringAmount) * loweringSmoothing;
-
-            if (offset)
-                weaponsprite.y = weaponsprite.y + crABS + loweringAmount;
-            else
-                weaponsprite.y = weaponsprite.y + loweringAmount;
+            outputLowerY = loweringAmount;
+            if (cvOffset)
+                outputLowerY += crABS;
         }
-        else if (offset)
+        else if (cvOffset)
         {
-            weaponsprite.y = weaponsprite.y + crABS;
+            outputLowerY = crABS;
+            loweringAmount = 0;
+        }
+        else
+        {
+            loweringAmount = 0;
         }
 
-        // --- Roll cap (optional) ---
-        if (limit && currentRoll > rLimit)
-            currentRoll = rLimit;
-
-        // --- Apply final rotation to weapon sprite (no leaning addition) ---
-        weaponsprite.rotation = currentRoll;
+        poseActive = abs(outputRoll) > 0.05 || abs(outputLowerY) > 0.1;
     }
 }
