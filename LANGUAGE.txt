@@ -2,12 +2,19 @@
 UWT_TITL = "Universal Tacticool";
 UWT_TIT2 = "Universal Tacticool";
 
+UWT_ENABLE = "Enable Tactical Weapon Motion";
 UWT_VELOCITY = "Velocity";
 UWT_RESISTANCE = "Resistance";
+UWT_TILT_SMOOTH = "Roll Smoothness";
 
 UWT_DEBUG = "Debug (WARNING: Console Spam)";
 UWT_CAP = "Cap Roll";
 UWT_CAPAMOUNT = "Cap Amount";
 
-UWT_OFFSET = "Offset Sprite when Strafing";
-UWT_LOWERING_INTENSITY = "Strafing Lowering Intensity";
+UWT_LOWERING_INTENSITY = "Pendulum Lowering Scale";
+
+UWT_PB_COMPAT = "PB / Brutal Family Compat";
+UWT_PB_COMPAT_OFF = "Off";
+UWT_PB_COMPAT_AUTO = "Auto";
+UWT_PB_COMPAT_ON = "On";
+UWT_PB_COMPAT_HELP = "Auto: overlay sync, PB idle labels, and safety tokens when PB, Brutal Pack, Brutal Doom, or Schism is detected.";

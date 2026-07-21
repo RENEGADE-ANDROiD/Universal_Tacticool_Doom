@@ -5,26 +5,31 @@ OptionMenu "WeaponTiltOptions"
    
     StaticText ""
 
-	Slider "$UWT_VELOCITY", "wt_rollvelocity", 0.50, 2.0, 0.01, 2
+	Option "$UWT_ENABLE", "wt_enable", "OnOff"
+	Option "$UWT_PB_COMPAT", "wt_pb_compat", "PbCompatModes"
+	StaticText "$UWT_PB_COMPAT_HELP", "Teal"
+	StaticText ""
 
-	Slider "$UWT_RESISTANCE", "wt_rollresistance", 0.10, 0.25, 0.01, 2
+	Slider "$UWT_VELOCITY", "wt_rollvelocity", 0.50, 8.0, 0.1, 2
+
+	Slider "$UWT_RESISTANCE", "wt_rollresistance", 0.08, 0.70, 0.01, 2
+
+	Slider "$UWT_TILT_SMOOTH", "wt_tilt_smoothing", 0.20, 0.95, 0.01, 2
 
     StaticText ""
 
-    Slider "$UWT_LOWERING_INTENSITY", "wt_lowering_intensity", 0.0, 2.0, 0.05, 2
-    StaticText "0 = No lowering, 1 = Default, 2 = Double", "Teal"
-    StaticText "Controls how much the weapon lowers when strafing.", "Teal"
+    Slider "$UWT_LOWERING_INTENSITY", "wt_lowering_intensity", 0.0, 2.5, 0.05, 2
+    StaticText "Pendulum dip scale (0.5 = STALKER baseline).", "Teal"
     Option "Enable Weapon Lowering", "wt_lowering", "OnOff"
     StaticText ""
 
     Option "$UWT_CAP", "wt_cap", "OnOff"
 
-    Slider "$UWT_CAPAMOUNT", "wt_rollcap", 1, 5, 0.5, 2
+    Slider "$UWT_CAPAMOUNT", "wt_rollcap", 1, 16, 0.5, 2
 
     StaticText ""
     
     Option "$UWT_DEBUG", "wt_debug", "OnOff"
-    Option "$UWT_OFFSET", "wt_offset", "YesNo"
 
     StaticText ""
     StaticText "Stability Controls", "Gold"
@@ -32,7 +37,6 @@ OptionMenu "WeaponTiltOptions"
     Slider  "Minimum Movement Speed", "wt_tilt_moving_min", 0.0, 8.0, 0.1, 1
     Option "Only Tilt in Ready/Hold States", "wt_tilt_ready", "OnOff"
     StaticText "Helps reduce visual jitter during fire/reload animations.", "Teal"
-    StaticText "Turn these on if another weapon mod has heavy offsets.", "Teal"
 
 }
 
@@ -46,4 +50,11 @@ AddOptionMenu "OptionsMenuSimple"
 {
 	Submenu "$UWT_TIT2", "WeaponTiltOptions"
     StaticText ""
+}
+
+OptionValue "PbCompatModes"
+{
+	0, "$UWT_PB_COMPAT_OFF"
+	1, "$UWT_PB_COMPAT_AUTO"
+	2, "$UWT_PB_COMPAT_ON"
 }

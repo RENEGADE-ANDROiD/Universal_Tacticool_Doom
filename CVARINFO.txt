@@ -1,16 +1,15 @@
-user float wt_rollresistance = 0.25;
-user float wt_rollvelocity = 2.0;
-user float wt_rollcap = 2.5;
+user bool wt_enable = true;
+user float wt_rollresistance = 0.6;
+user float wt_rollvelocity = 4.0;
+user float wt_rollcap = 12.0;
 user bool wt_lowering = true;
-user bool wt_offset = true;
-user float wt_lowering_intensity = 1.0;
+user float wt_lowering_intensity = 0.5;
+user float wt_tilt_smoothing = 0.38;
 server float sv_leanangle = 22.5;
 user bool cl_strafelean = false;
 user bool wt_cap = true;
 user bool wt_debug = false;
-// When on, strafe-tilt only builds while the player is moving; otherwise roll decays.
 user bool wt_tilt_moving = false;
-// Minimum 2D velocity (per tic) to count as "moving" for wt_tilt_moving.
 user float wt_tilt_moving_min = 1.0;
-// When on, strafe-tilt only builds in the weapon Ready (or Hold) state sequence; fire/reload/etc. decay the roll.
 user bool wt_tilt_ready = false;
+user int wt_pb_compat = 1;
