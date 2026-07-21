@@ -9,7 +9,8 @@ This branch adds code made by Dithered Output, maker of Siren, that has all been
 
 Includes a customized menu with slider options for everything.
 See Control Options to set Lean Keybind
-------------------
+
 Does NOT include Tilt++ or Weapon Sway.
+------------------
 
 Works universally for Doom, Doom II, Heretic and Hexen.
